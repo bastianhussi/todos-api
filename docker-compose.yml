@@ -1,0 +1,21 @@
+version: '3.1'
+
+services:
+  db:
+    image: postgres:13.1-alpine
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: TODO
+  redis:
+    image: redis:6.2-rc2-alpine3.12
+    restart: always
+    environment:
+      POSTGRES_PASSWORD:
+  api:
+    build: . 
+    restart: always
+    environment:
+      DB_HOST: db
+      DB_USER: TODO
+    ports:
+      - 3000:3000
