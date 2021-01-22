@@ -10,17 +10,20 @@ import (
 
 	api "github.com/bastianhussi/todos-api"
 	login "github.com/bastianhussi/todos-api/login"
+	register "github.com/bastianhussi/todos-api/register"
 )
 
 var (
-	l *log.Logger
-	s *api.Server
+	l   *log.Logger
+	srv *api.Server
 )
 
 func init() {
-	l := log.New(os.Stdout, "api: ", log.LstdFlags|log.Lshortfile)
-	s = api.NewServer(l)
-	s.AddRoute(login.NewHandler(l))
+	logger := log.New(os.Stdout, "api: ", log.LstdFlags|log.Lshortfile)
+	srv = api.NewServer(logger)
+	res := api.NewResources(logger)
+	srv.AddRoute(login.NewHandler(res))
+	srv.AddRoute(register.NewHandler(res))
 }
 
 func main() {
@@ -38,7 +41,7 @@ func main() {
 
 	// defer db.Close()
 
-	go s.Run()
+	go srv.Run()
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
@@ -48,5 +51,5 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	s.Shutdown(ctx)
+	srv.Shutdown(ctx)
 }

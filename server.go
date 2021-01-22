@@ -18,11 +18,11 @@ func NewServer(l *log.Logger) *Server {
 	s.logger = l
 	s.Mux = http.NewServeMux()
 	s.srv = &http.Server{
-		Addr:        ":3000",
-		ReadTimeout: 10 * time.Second,
+		Addr:         ":3000",
+		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
-		Handler: s.Mux,
+		Handler:      s.Mux,
 	}
 
 	return s

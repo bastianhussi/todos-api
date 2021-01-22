@@ -1,4 +1,4 @@
-package login
+package register
 
 import (
 	api "github.com/bastianhussi/todos-api"
@@ -16,9 +16,9 @@ func NewHandler(res *api.Resources) *Handler {
 	}
 }
 
-// Login handles the request for the `/login` route.
+// Register handles the request for the `/login` route.
 // Only POST-request are allowed.
-func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		defer w.WriteHeader(http.StatusMethodNotAllowed)
 	} else {
@@ -30,6 +30,6 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 
 // Route add the routes of this package to the mux
 func (h *Handler) Route(m *http.ServeMux) {
-	m.HandleFunc("/login", h.res.Logging(h.Login))
-	m.HandleFunc("/login/", h.res.Logging(h.Login))
+	m.HandleFunc("/register", h.res.Logging(h.Register))
+	m.HandleFunc("/register/", h.res.Logging(h.Register))
 }

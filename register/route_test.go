@@ -1,4 +1,4 @@
-package login_test
+package register_test
 
 import (
 	"log"
@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	api "github.com/bastianhussi/todos-api"
-	"github.com/bastianhussi/todos-api/login"
+	"github.com/bastianhussi/todos-api/register"
 )
 
 func TestLogin(t *testing.T) {
@@ -23,7 +23,7 @@ func TestLogin(t *testing.T) {
 		{
 			name:           "pass",
 			shouldFail:     false,
-			in:             httptest.NewRequest(http.MethodPost, "/login", nil),
+			in:             httptest.NewRequest(http.MethodPost, "/register", nil),
 			out:            httptest.NewRecorder(),
 			expectedStatus: http.StatusCreated,
 			expectedBody:   "Hello, World!",
@@ -31,7 +31,7 @@ func TestLogin(t *testing.T) {
 		{
 			name:           "fail",
 			shouldFail:     true,
-			in:             httptest.NewRequest(http.MethodGet, "/login", nil),
+			in:             httptest.NewRequest(http.MethodGet, "/register", nil),
 			out:            httptest.NewRecorder(),
 			expectedStatus: http.StatusOK,
 			expectedBody:   "Hello, World!",
@@ -52,8 +52,8 @@ func TestLogin(t *testing.T) {
 			logger := log.New(os.Stdout, "webserver: ", log.LstdFlags|log.Lshortfile)
 			res := api.NewResources(logger)
 
-			h := login.NewHandler(res)
-			h.Login(test.out, test.in)
+			h := register.NewHandler(res)
+			h.Register(test.out, test.in)
 
 			code, body := test.out.Code, test.out.Body.String()
 
