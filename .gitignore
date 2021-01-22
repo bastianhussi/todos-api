@@ -16,3 +16,6 @@
 
 # configuration and secrets
 config.yml
+
+# IDE
+.vscode
