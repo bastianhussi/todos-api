@@ -11,10 +11,13 @@ import (
 	api "github.com/bastianhussi/todos-api"
 	login "github.com/bastianhussi/todos-api/login"
 	register "github.com/bastianhussi/todos-api/register"
+	"github.com/go-pg/pg/v10"
 )
 
 var (
 	l   *log.Logger
+	c   *api.Config
+	db  *pg.DB
 	srv *api.Server
 )
 
@@ -24,23 +27,18 @@ func init() {
 	res := api.NewResources(logger)
 	srv.AddRoute(login.NewHandler(res))
 	srv.AddRoute(register.NewHandler(res))
+
+	c, err := api.NewConfig()
+	must(err)
+
+	db, err := api.NewDB(c)
+	must(err)
+
+	err = api.CreateSchema(db.Conn())
+	must(err)
 }
 
 func main() {
-	// c := new(api.Config)
-	// if err := c.ReadConfig(); err != nil {
-	// 	panic(err)
-	// }
-	// rdb := api.NewRedisClient()
-	// defer rdb.Close()
-
-	// db, err := api.NewDB()
-	// if err != nil {
-	// 	panic(err)
-	// }
-
-	// defer db.Close()
-
 	go srv.Run()
 
 	stop := make(chan os.Signal, 1)
@@ -52,4 +50,10 @@ func main() {
 	defer cancel()
 
 	srv.Shutdown(ctx)
+}
+
+func must(err error) {
+	if err != nil {
+		panic(err)
+	}
 }

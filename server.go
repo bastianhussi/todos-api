@@ -33,6 +33,7 @@ func (s *Server) AddRoute(r Router) {
 }
 
 func (s *Server) Run() {
+	s.logger.Println("Server is starting 🚀")
 	if err := s.srv.ListenAndServe(); err == http.ErrServerClosed {
 		s.logger.Println("Server stopped 🛑")
 	} else {
