@@ -50,7 +50,7 @@ func TestLogin(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			logger := log.New(os.Stdout, "webserver: ", log.LstdFlags|log.Lshortfile)
-			res := api.NewResources(logger)
+			res := api.NewResources(logger, nil)
 
 			h := login.NewHandler(res)
 			h.Login(test.out, test.in)

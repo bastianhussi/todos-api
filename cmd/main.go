@@ -22,23 +22,27 @@ var (
 )
 
 func init() {
-	logger := log.New(os.Stdout, "api: ", log.LstdFlags|log.Lshortfile)
-	srv = api.NewServer(logger)
-	res := api.NewResources(logger)
-	srv.AddRoute(login.NewHandler(res))
-	srv.AddRoute(register.NewHandler(res))
-
 	c, err := api.NewConfig()
 	must(err)
 
-	db, err := api.NewDB(c)
+	db, err = api.NewDB(c)
 	must(err)
 
+	l = log.New(os.Stdout, "api: ", log.LstdFlags|log.Lshortfile)
+
+	// TODO: use goroutines to handle these two tasks asyncronous
+	res := api.NewResources(l, db)
 	err = api.CreateSchema(db.Conn())
 	must(err)
+
+	srv = api.NewServer(l)
+	srv.AddRoute(login.NewHandler(res))
+	srv.AddRoute(register.NewHandler(res))
+
 }
 
 func main() {
+	defer db.Close()
 	go srv.Run()
 
 	stop := make(chan os.Signal, 1)
