@@ -1,10 +1,7 @@
 package login
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 
 	api "github.com/bastianhussi/todos-api"
@@ -23,62 +20,69 @@ func NewHandler(res *api.Resources) *Handler {
 	}
 }
 
-func (h *Handler) post(w http.ResponseWriter, r *http.Request) (int, error) {
-	data, err := ioutil.ReadAll(r.Body)
+func (h *Handler) post(w http.ResponseWriter, r *http.Request, c chan<- struct{}) {
+	ctx := r.Context()
+
+	p, err := fromRequest(r)
 	if err != nil {
-		return http.StatusBadRequest, err
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		c <- struct{}{}
+		return
 	}
 
-	profile := new(api.Profile)
+	conn := h.res.DB.Conn()
+	defer conn.Close()
 
-	if err := json.Unmarshal(data, profile); err != nil {
-		return http.StatusBadRequest, err
-	}
-
-	if profile.Email == "" {
-		return http.StatusBadRequest, errors.New("Please provide an email address")
-	}
-
-	if profile.Password == "" {
-		return http.StatusBadRequest, errors.New("Please provide a password")
-	}
-
-	c := h.res.DB.Conn()
-	defer c.Close()
-
-	storedProfile := new(api.Profile)
-
-	if err := c.Model(storedProfile).Where("email = ?", profile.Email).Select(); err != nil {
+	// TODO: use a goroutine instead
+	storedProfile, err := receiveUserFromDB(ctx, conn, p.Email)
+	if err != nil {
 		if err == pg.ErrNoRows {
-			return http.StatusNotFound, errors.New(fmt.Sprintf("Could not find a profile with the email address %s", profile.Email))
+			http.Error(w, fmt.Sprintf("No profile with email %s found", p.Email), http.StatusNotFound)
 		} else {
-			panic(err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 		}
+		c <- struct{}{}
+		return
 	}
 
-	err = bcrypt.CompareHashAndPassword([]byte(storedProfile.Password), []byte(profile.Password))
-	must(err)
+	tokenRes := make(chan TokenResult)
+	go generateToken(p, tokenRes)
 
-	res, err := json.Marshal(storedProfile)
-	must(err)
+	res := <-tokenRes
+	if res.err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		c <- struct{}{}
+		return
+	}
 
-	w.Header().Add("Content-Type", "application/json; charset=utf-8")
+	bcrypt.CompareHashAndPassword([]byte(storedProfile.Password), []byte(p.Password))
+
+	w.Header().Add("Content-Type", "plain/text; charset=utf-8")
 	w.WriteHeader(http.StatusCreated)
-	_, err = w.Write(res)
-	must(err)
 
-	return 0, nil
+	_, _ = w.Write([]byte(res.token))
+
+	c <- struct{}{}
 }
 
 // Login handles the request for the `/login` route.
 // Only POST-request are allowed.
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
-	defer h.res.HandleRequestPanic(w, r)
+	ctx := r.Context()
+	defer h.res.HandleRequestPanic(w)
+
+	c := make(chan struct{})
 
 	switch r.Method {
 	case http.MethodPost:
-		if code, err := h.post(w, r); err != nil {
-			h.res.HandleRequest(w, r, code, err)
+		go h.post(w, r, c)
+
+		select {
+		case <-c:
+			return
+		case <-ctx.Done():
+			err := ctx.Err()
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)

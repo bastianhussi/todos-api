@@ -1,12 +1,10 @@
 package register
 
 import (
-	"encoding/json"
-	"errors"
-	"io/ioutil"
 	"net/http"
 
 	api "github.com/bastianhussi/todos-api"
+	"github.com/go-pg/pg/v10"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -20,70 +18,66 @@ func NewHandler(res *api.Resources) *Handler {
 	return &Handler{res}
 }
 
-func (h *Handler) post(w http.ResponseWriter, r *http.Request) (int, error) {
+func (h *Handler) post(w http.ResponseWriter, r *http.Request, c chan<- struct{}) {
+	ctx := r.Context()
 
-	data, err := ioutil.ReadAll(r.Body)
+	p, err := fromRequest(r)
 	if err != nil {
-		return http.StatusBadRequest, err
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		c <- struct{}{}
+		return
 	}
-
-	profile := new(api.Profile)
-
-	if err := json.Unmarshal(data, profile); err != nil {
-		return http.StatusBadRequest, err
-	}
-
-	if profile.Email == "" {
-		return http.StatusBadRequest, errors.New("Please provide an email address")
-	}
-
-	if profile.Name == "" {
-		return http.StatusBadRequest, errors.New("Please provide a profile name")
-	}
-
-	if profile.Password == "" {
-		return http.StatusBadRequest, errors.New("Please provide a password")
-	}
-
-	encryptedPass, err := bcrypt.GenerateFromPassword([]byte(profile.Password), bcrypt.DefaultCost)
+	encryptedPass, err := bcrypt.GenerateFromPassword([]byte(p.Password), bcrypt.DefaultCost)
 	if err != nil {
 		panic(err)
 	}
+	p.Password = string(encryptedPass)
 
-	c := h.res.DB.Conn()
-	defer c.Close()
+	conn := h.res.DB.Conn()
+	defer conn.Close()
 
-	profile.Password = string(encryptedPass)
-	if _, err := c.Model(profile).Insert(); err != nil {
-		panic(err)
-	}
+	dbChannel := make(chan error)
+	go saveUserInDB(ctx, conn, p, dbChannel)
 
-	// FIXME: remove this. No need to return the created profile to the user
-	if err := c.Model(profile).Where("email = ?", profile.Email).Select(); err != nil {
-		return http.StatusBadRequest, err
-	}
-
-	res, err := json.Marshal(profile)
-	if err != nil {
-		must(err)
+	select {
+	case err = <-dbChannel:
+		if err != nil {
+			pgErr, ok := err.(pg.Error)
+			if ok && pgErr.IntegrityViolation() {
+				http.Error(w, "Account already exists", http.StatusBadRequest)
+				c <- struct{}{}
+				return
+			}
+			h.res.Logger.Println(err.Error())
+		}
+	case <-ctx.Done():
+		return
 	}
 
 	w.Header().Add("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(http.StatusCreated)
-	w.Write(res)
+	_, _ = w.Write([]byte{})
 
-	return http.StatusCreated, nil
+	c <- struct{}{}
 }
 
 // Register handles the request for the `/login` route.
 // Only POST-request are allowed.
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
-	defer h.res.HandleRequestPanic(w, r)
+	ctx := r.Context()
+	defer h.res.HandleRequestPanic(w)
 
+	c := make(chan struct{})
 	switch r.Method {
 	case http.MethodPost:
-		code, err := h.post(w, r)
-		h.res.HandleRequest(w, r, code, err)
+		go h.post(w, r, c)
+
+		select {
+		case <-c:
+			return
+		case <-ctx.Done():
+			panic("Request canceled by client")
+		}
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
