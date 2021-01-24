@@ -9,8 +9,8 @@ import (
 	"time"
 
 	api "github.com/bastianhussi/todos-api"
-	login "github.com/bastianhussi/todos-api/login"
-	register "github.com/bastianhussi/todos-api/register"
+	register "github.com/bastianhussi/todos-api/login"
+	login "github.com/bastianhussi/todos-api/register"
 	"github.com/go-pg/pg/v10"
 )
 

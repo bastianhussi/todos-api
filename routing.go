@@ -34,17 +34,24 @@ func (res *Resources) Logging(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func (res *Resources) HandleBadRequest(w http.ResponseWriter, r *http.Request, err error) {
+func (res *Resources) HandleRequest(w http.ResponseWriter, r *http.Request, code int, err error) {
 	w.Header().Add("Content-Type", "plain/text; charset=utf-8")
-	w.WriteHeader(http.StatusBadRequest)
-	_, _ = w.Write([]byte(err.Error()))
-	res.Logger.Printf("Bad request: %s\n", err)
+	w.WriteHeader(code)
+	_, err = w.Write([]byte(err.Error()))
+	must(err)
 }
 
-func (res *Resources) HandleInternalServerError(w http.ResponseWriter, r *http.Request) {
+func (res *Resources) HandleRequestPanic(w http.ResponseWriter, r *http.Request) {
 	if err := recover(); err != nil {
 		res.Logger.Printf("Recovered from panic: %s\n", err)
 		w.Header().Add("Content-Type", "plain/text; charset=utf-8")
 		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte{})
+	}
+}
+
+func must(err error) {
+	if err != nil {
+		panic(err)
 	}
 }
