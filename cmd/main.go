@@ -38,7 +38,6 @@ func init() {
 	srv = api.NewServer(l)
 	srv.AddRoute(login.NewHandler(res))
 	srv.AddRoute(register.NewHandler(res))
-
 }
 
 func main() {

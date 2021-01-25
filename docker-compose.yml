@@ -1,4 +1,4 @@
-version: '3.1'
+version: "3.1"
 
 services:
   pg:
@@ -12,10 +12,10 @@ services:
     image: redis:6.2-rc2-alpine3.12
     restart: always
   api:
-    build: . 
+    build: .
     restart: always
     environment:
-      POSTGRES_HOST: "pg":5432"
+      POSTGRES_HOST: "pg:5432"
       POSTGRES_DATABASE: "todos"
       POSTGRES_USER: "api"
       POSTGRES_PASSWORD: "1234"

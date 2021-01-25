@@ -35,16 +35,12 @@ func (res *Resources) Logging(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func (res *Resources) HandleRequest(w http.ResponseWriter, r *http.Request, code int, err error) {
-	w.Header().Add("Content-Type", "plain/text; charset=utf-8")
-	w.WriteHeader(code)
-	_, err = w.Write([]byte(err.Error()))
-	must(err)
-}
-
+// HandleRequestPanic should be called at the end of request handlers to ensure
+// that panics are not crashing the application. Panics will be used to indicate
+// error that have not been created by user input.
 func (res *Resources) HandleRequestPanic(w http.ResponseWriter) {
 	if err := recover(); err != nil {
-		http.Error(w, "", http.StatusInternalServerError)
+		http.Error(w, "Oh noo, something went wrong 🤯", http.StatusInternalServerError)
 	}
 }
 
