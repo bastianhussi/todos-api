@@ -6,21 +6,11 @@ import (
 
 	api "github.com/bastianhussi/todos-api"
 	"github.com/go-pg/pg/v10"
-	"golang.org/x/crypto/bcrypt"
 )
 
-type Handler struct {
-	res *api.Resources
-}
+var res *api.Resources
 
-// NewHandler creates a new Handler.
-func NewHandler(res *api.Resources) *Handler {
-	return &Handler{
-		res,
-	}
-}
-
-func (h *Handler) post(w http.ResponseWriter, r *http.Request, c chan<- struct{}) {
+func post(w http.ResponseWriter, r *http.Request, c chan<- struct{}) {
 	ctx := r.Context()
 
 	p, err := fromRequest(r)
@@ -30,11 +20,11 @@ func (h *Handler) post(w http.ResponseWriter, r *http.Request, c chan<- struct{}
 		return
 	}
 
-	conn := h.res.DB.Conn()
+	conn := res.DB.Conn()
 	defer conn.Close()
 
 	// TODO: use a goroutine instead
-	storedProfile, err := receiveUserFromDB(ctx, conn, p.Email)
+	dbProfile, err := receiveUserFromDB(ctx, conn, p.Email)
 	if err != nil {
 		if err == pg.ErrNoRows {
 			http.Error(w, fmt.Sprintf("No profile with email %s found", p.Email), http.StatusNotFound)
@@ -55,27 +45,26 @@ func (h *Handler) post(w http.ResponseWriter, r *http.Request, c chan<- struct{}
 		return
 	}
 
-	bcrypt.CompareHashAndPassword([]byte(storedProfile.Password), []byte(p.Password))
+	if ok := decryptPass(ctx, dbProfile.Password, p.Password); !ok {
+		http.Error(w, "Wrong password! Please try again", http.StatusBadRequest)
+	}
 
 	w.Header().Add("Content-Type", "plain/text; charset=utf-8")
 	w.WriteHeader(http.StatusCreated)
-
 	_, _ = w.Write([]byte(res.token))
 
 	c <- struct{}{}
 }
 
-// Login handles the request for the `/login` route.
-// Only POST-request are allowed.
-func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
+func login(w http.ResponseWriter, r *http.Request) {
+
 	ctx := r.Context()
-	defer h.res.HandleRequestPanic(w)
 
 	c := make(chan struct{})
 
 	switch r.Method {
 	case http.MethodPost:
-		go h.post(w, r, c)
+		go post(w, r, c)
 
 		select {
 		case <-c:
@@ -89,14 +78,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Route add the routes of this package to the mux
-func (h *Handler) Route(m *http.ServeMux) {
-	m.HandleFunc("/login", h.res.Logging(h.Login))
-	m.HandleFunc("/login/", h.res.Logging(h.Login))
-}
-
-func must(err error) {
-	if err != nil {
-		panic(err)
-	}
+func NewHandler(s *api.Server) {
+	res = s.Res
+	s.AddRoute([]string{"/login"}, login, "POST")
 }

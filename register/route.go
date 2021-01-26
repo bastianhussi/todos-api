@@ -8,19 +8,11 @@ import (
 	"github.com/go-pg/pg/v10"
 )
 
-// Handler holds all information needed to handle the incoming request (db-access, logging, eg.)
-type Handler struct {
-	res *api.Resources
-}
-
-// NewHandler creates a new Handler.
-func NewHandler(res *api.Resources) *Handler {
-	return &Handler{res}
-}
-
+// TODO: refactor this method. It should be stripped-down.
 // post handles the incoming post request. When the request has been processed
 // an empty struct is send into the channel indicating, that the task has been completed.
-func (h *Handler) post(w http.ResponseWriter, r *http.Request, c chan<- struct{}) {
+func post(w http.ResponseWriter, r *http.Request, c chan<- struct{}) {
+	defer r.Body.Close()
 	ctx := r.Context()
 
 	p, err := fromRequest(r)
@@ -36,7 +28,7 @@ func (h *Handler) post(w http.ResponseWriter, r *http.Request, c chan<- struct{}
 
 	// create a new database connection
 	// FIXME: can this operation block if a lot of conns are open? Use a goroutine instead?
-	conn := h.res.DB.Conn()
+	conn := res.DB.Conn()
 	defer conn.Close()
 	dbChannel := make(chan dbResult)
 
@@ -44,17 +36,19 @@ func (h *Handler) post(w http.ResponseWriter, r *http.Request, c chan<- struct{}
 	p.Password = <-passChannel
 	go saveUserInDB(ctx, conn, p, dbChannel)
 
+	// TODO: extract this into an other function.
+	// This method should not handle the cancellation of this task.
 	// check if the write to the database could finish before the request was cancelt.
 	select {
 	case res := <-dbChannel:
 		// handle the database response: Commit if the write as successful
-		// or 
+		// or
 		err = func(tx *pg.Tx, err error) error {
 			// Could not commit: The transaction was already rolled back.
 			if err != nil {
 				pgErr, ok := err.(pg.Error)
 				if ok && pgErr.IntegrityViolation() {
-					return fmt.Errorf("Profile with email %s already exists", p.Email)
+					return fmt.Errorf("profile with email %s already exists", p.Email)
 				}
 				panic(err)
 			} else {
@@ -76,41 +70,35 @@ func (h *Handler) post(w http.ResponseWriter, r *http.Request, c chan<- struct{}
 
 	w.Header().Add("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(http.StatusCreated)
-	_, _ = w.Write([]byte{})
+	_, _ = fmt.Fprintf(w, "Profile succesfully created")
 
 	c <- struct{}{}
 }
 
-// Register handles the request for the `/login` route.
-// Only POST-request are allowed.
-func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
+var res *api.Resources
+
+func register(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	// recover from potential panics (aka internal server errors)
-	defer h.res.HandleRequestPanic(w)
 
-	c := make(chan struct{})
-	switch r.Method {
-	case http.MethodPost:
-		// process the post request in a separate goroutine.
-		go h.post(w, r, c)
-
-		// check if the goroutine finishes before the request is beeing canceld.
-		select {
-		case <-c:
-			// request successfully handled
-			return
-		case <-ctx.Done():
-			panic("Request canceled by client")
-		}
-	default:
+	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	c := make(chan struct{}, 1)
+	go post(w, r, c)
+
+	select {
+	case <-c:
+		return
+	case <-ctx.Done():
+		panic(ctx.Err().Error())
 	}
 }
 
-// Route add the routes of this package to the mux
-func (h *Handler) Route(m *http.ServeMux) {
-	m.HandleFunc("/register", h.res.Logging(h.Register))
-	m.HandleFunc("/register/", h.res.Logging(h.Register))
+func NewHandler(s *api.Server) {
+	res = s.Res
+	s.AddRoute([]string{"/register"}, register, "POST")
 }
 
 // little helperfunction which causes a panic if the error is not nil.

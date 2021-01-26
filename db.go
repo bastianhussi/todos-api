@@ -8,8 +8,11 @@ import (
 	"github.com/go-pg/pg/v10/orm"
 )
 
+// Nice blog post about pg: https://medium.com/tunaiku-tech/go-pg-golang-postgre-orm-2618b75c0430
+
 var ctx = context.Background()
 
+// Profile
 type Profile struct {
 	tableName struct{} `pg:"profiles,alias:profile"`
 	ID        int      `pg:",pk"`
@@ -18,6 +21,7 @@ type Profile struct {
 	Password  string   `pg:",notnull" json:"password"`
 }
 
+// Todo
 type Todo struct {
 	tableName struct{}  `pg:"todos,alias:todo"`
 	ID        int       `pg:",pk"`
@@ -27,6 +31,7 @@ type Todo struct {
 	Profile   *Profile `pg:"rel:has-one,notnull"`
 }
 
+// Task
 type Task struct {
 	tableName struct{} `pg:"tasks,alias:task"`
 	ID        int      `pg:",pk"`

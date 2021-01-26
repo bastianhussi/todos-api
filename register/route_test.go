@@ -1,10 +1,8 @@
 package register_test
 
 import (
-	"log"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 
 	api "github.com/bastianhussi/todos-api"
@@ -49,11 +47,12 @@ func TestLogin(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			logger := log.New(os.Stdout, "webserver: ", log.LstdFlags|log.Lshortfile)
-			res := api.NewResources(logger, nil)
+			c, err := api.NewConfig()
+			must(err)
+			_, err = api.NewResources(c)
+			must(err)
 
-			h := register.NewHandler(res)
-			h.Register(test.out, test.in)
+			register(test.out, test.in)
 
 			code, body := test.out.Code, test.out.Body.String()
 
@@ -71,5 +70,11 @@ func TestLogin(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func must(err error) {
+	if err != nil {
+		panic(err)
 	}
 }

@@ -3,7 +3,7 @@ WORKDIR /app
 COPY . .
 RUN go build -o server ./cmd/main.go
 
-FROm docker.io/alpine:3.12.3 as production-stage
+FROM docker.io/alpine:3.12.3 as production-stage
 COPY --from=build-stage /app/server /usr/local/bin/server
 EXPOSE 3000
 CMD ["server"]

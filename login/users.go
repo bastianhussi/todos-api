@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"golang.org/x/crypto/bcrypt"
 	"io/ioutil"
 	"net/http"
 
@@ -12,24 +13,29 @@ import (
 )
 
 func receiveUserFromDB(ctx context.Context, conn *pg.Conn, email string) (*api.Profile, error) {
-	tx, err := conn.Begin()
-	if err != nil {
-		panic(err)
-	}
-	defer tx.Close()
-
 	p := new(api.Profile)
-	if err := conn.ModelContext(ctx, p).Where("email = ?", email).Select(); err != nil {
-		_ = tx.Rollback()
+	if err := conn.ModelContext(
+		ctx,
+		p,
+	).Limit(1).Where("email = ?", email).Select(); err != nil {
 		return nil, err
 	}
 
-	// Commit on success.
-	if err := tx.Commit(); err != nil {
-		panic(err)
-	}
-
 	return p, nil
+}
+
+func decryptPass(ctx context.Context, hashedPass string, pass string) bool {
+	c := make(chan error, 1)
+	go func() {
+		c <- bcrypt.CompareHashAndPassword([]byte(hashedPass), []byte(pass))
+	}()
+
+	select {
+	case err := <-c:
+		return err == nil
+	case <-ctx.Done():
+		return false
+	}
 }
 
 func fromRequest(r *http.Request) (*api.Profile, error) {

@@ -10,6 +10,7 @@ import (
 
 // Config holds all values required to log into databases and some extra settings like timeouts.
 type Config struct {
+	Port int
 	Redis    *redis.Options
 	Postgres *pg.Options
 	Timeout  *struct {

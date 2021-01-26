@@ -29,7 +29,7 @@ func saveUserInDB(ctx context.Context, conn *pg.Conn, p *api.Profile, c chan<- d
 	}
 
 	// Try to write into the database. If that fails rollback
-	if _, err := conn.ModelContext(ctx, p).Insert(); err != nil {
+	if _, err := conn.ModelContext(ctx, p).Returning("id").Insert(); err != nil {
 		defer tx.Close()
 		_ = tx.Rollback()
 		c <- dbResult{nil, err}
