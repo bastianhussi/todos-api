@@ -10,7 +10,7 @@ import (
 
 var res *api.Resources
 
-func post(w http.ResponseWriter, r *http.Request, c chan<- struct{}) {
+func (h *Handler) post(w http.ResponseWriter, r *http.Request, c chan<- struct{}) {
 	ctx := r.Context()
 
 	p, err := fromRequest(r)
@@ -56,29 +56,29 @@ func post(w http.ResponseWriter, r *http.Request, c chan<- struct{}) {
 	c <- struct{}{}
 }
 
-func login(w http.ResponseWriter, r *http.Request) {
-
+func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	c := make(chan struct{})
+	go h.post(w, r, c)
 
-	switch r.Method {
-	case http.MethodPost:
-		go post(w, r, c)
-
-		select {
-		case <-c:
-			return
-		case <-ctx.Done():
-			err := ctx.Err()
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-	default:
-		w.WriteHeader(http.StatusMethodNotAllowed)
+	select {
+	case <-c:
+		return
+	case <-ctx.Done():
+		err := ctx.Err()
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
-func NewHandler(s *api.Server) {
-	res = s.Res
-	s.AddRoute([]string{"/login"}, login, "POST")
+type Handler struct {
+	res *api.Resources
+}
+
+func NewHandler(res *api.Resources) *Handler {
+	return &Handler{res}
+}
+
+func (h *Handler) RegisterRoute(s *api.Server) {
+	s.AddHandler([]string{"/login"}, h.Login, "POST")
 }

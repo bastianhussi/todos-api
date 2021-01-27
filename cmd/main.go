@@ -2,43 +2,40 @@ package main
 
 import (
 	"context"
-	"github.com/bastianhussi/todos-api/login"
-	"github.com/bastianhussi/todos-api/profile"
-	"github.com/bastianhussi/todos-api/register"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/bastianhussi/todos-api/login"
+	"github.com/bastianhussi/todos-api/register"
+	"github.com/gorilla/mux"
+
 	api "github.com/bastianhussi/todos-api"
 )
 
 var (
-	c   *api.Config
-	res *api.Resources
-	s   *api.Server
+	res    *api.Resources
+	router *mux.Router
+	srv    *api.Server
 )
 
 func init() {
-	c, err := api.NewConfig()
+	config, err := api.NewConfig()
 	must(err)
 
 	// TODO: use goroutines to handle these two tasks asyncronous
-	res, err = api.NewResources(c)
+	res, err = api.NewResources(config)
 	must(err)
-	err = api.CreateSchema(res.DB.Conn())
-	must(err)
-
-	s = api.NewServer(c, res)
-	// Doesn't work because Mux.HandleFunc is not a function, its a method of *mux.Router
-	login.NewHandler(s)
-	register.NewHandler(s)
-	profile.NewHandler(s)
+	must(api.CreateSchema(res.DB.Conn()))
+	srv = api.NewServer(res.Logger, config)
+	login.NewHandler(res).RegisterRoute(srv)
+	register.NewHandler(res).RegisterRoute(srv)
 }
 
 func main() {
 	defer res.DB.Close()
-	go s.Run()
+	go srv.Run()
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
@@ -48,7 +45,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	s.Shutdown(ctx)
+	srv.Shutdown(ctx)
 }
 
 func must(err error) {

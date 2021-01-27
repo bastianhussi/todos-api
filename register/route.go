@@ -8,10 +8,14 @@ import (
 	"github.com/go-pg/pg/v10"
 )
 
+type Handler struct {
+	res *api.Resources
+}
+
 // TODO: refactor this method. It should be stripped-down.
 // post handles the incoming post request. When the request has been processed
 // an empty struct is send into the channel indicating, that the task has been completed.
-func post(w http.ResponseWriter, r *http.Request, c chan<- struct{}) {
+func (h *Handler) post(w http.ResponseWriter, r *http.Request, c chan<- struct{}) {
 	defer r.Body.Close()
 	ctx := r.Context()
 
@@ -28,7 +32,7 @@ func post(w http.ResponseWriter, r *http.Request, c chan<- struct{}) {
 
 	// create a new database connection
 	// FIXME: can this operation block if a lot of conns are open? Use a goroutine instead?
-	conn := res.DB.Conn()
+	conn := h.res.DB.Conn()
 	defer conn.Close()
 	dbChannel := make(chan dbResult)
 
@@ -75,18 +79,11 @@ func post(w http.ResponseWriter, r *http.Request, c chan<- struct{}) {
 	c <- struct{}{}
 }
 
-var res *api.Resources
-
-func register(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-
 	c := make(chan struct{}, 1)
-	go post(w, r, c)
+	go h.post(w, r, c)
 
 	select {
 	case <-c:
@@ -96,9 +93,13 @@ func register(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func NewHandler(s *api.Server) {
-	res = s.Res
-	s.AddRoute([]string{"/register"}, register, "POST")
+
+func (h *Handler) RegisterRoute(s *api.Server) {
+	s.AddHandler([]string{"/register"}, h.Register, "POST")
+}
+
+func NewHandler(res *api.Resources) *Handler {
+	return &Handler{res}
 }
 
 // little helperfunction which causes a panic if the error is not nil.

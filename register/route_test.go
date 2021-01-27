@@ -49,10 +49,11 @@ func TestLogin(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			c, err := api.NewConfig()
 			must(err)
-			_, err = api.NewResources(c)
+			res, err := api.NewResources(c)
 			must(err)
+			h := register.NewHandler(res)
 
-			register(test.out, test.in)
+			h.Register(test.out, test.in)
 
 			code, body := test.out.Code, test.out.Body.String()
 

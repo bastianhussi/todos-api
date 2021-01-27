@@ -1,10 +1,8 @@
 package login_test
 
 import (
-	"log"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 
 	api "github.com/bastianhussi/todos-api"
@@ -49,8 +47,10 @@ func TestLogin(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			logger := log.New(os.Stdout, "webserver: ", log.LstdFlags|log.Lshortfile)
-			res := api.NewResources(logger, nil)
+			c, err := api.NewConfig()
+			must(err)
+			res, err := api.NewResources(c)
+			must(err)
 
 			h := login.NewHandler(res)
 			h.Login(test.out, test.in)
@@ -71,5 +71,11 @@ func TestLogin(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func must(err error) {
+	if err != nil {
+		panic(err)
 	}
 }
