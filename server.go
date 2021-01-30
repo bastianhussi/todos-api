@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -42,6 +43,7 @@ func (s *Server) middleware(next http.HandlerFunc) http.HandlerFunc {
 		// Handle potential panics
 		defer func() {
 			if err := recover(); err != nil {
+				s.logger.Println(err)
 				http.Error(w, "Oh noo, something went wrong 🤯", http.StatusInternalServerError)
 			}
 		}()
@@ -51,6 +53,19 @@ func (s *Server) middleware(next http.HandlerFunc) http.HandlerFunc {
 		s.logger.Printf("Got %s request at %s\n", r.Method, r.URL.Path)
 		next(w, r)
 		s.logger.Printf("Request processed in %s\n", time.Since(start))
+	}
+}
+
+func (s *Server) Auth(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token := r.Header.Get("Authorization")
+		token = strings.Split(token, "Bearer ")[1]
+		s.logger.Println(token)
+		if ok := verifyToken(token, "secret", []string{}); !ok {
+			http.Error(w, "Invalid jwt token", http.StatusBadRequest)
+			return
+		}
+		next(w, r)
 	}
 }
 

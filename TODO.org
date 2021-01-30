@@ -1,0 +1,14 @@
+* TODO: Refactoring
+  - [ ] Remove unnecessary goroutines
+  - [ ] Make every goroutine check the context for cancellation
+  - [ ] Create a auth middleware (might require further refactoring)
+  - [ ] Write way more unit tests (jwt, database, e.g. totally uncovered at the moment)
+  - [ ] Add more comments
+* TODO: Functional Updates
+  - [ ] Store user sessions in redis
+  - [ ] Add email verification
+  - [X] Create a /profile route for account management
+  - [ ] Create a /todos route and todo-managemnt
+  - [ ] Add 2-factor auth like OTP
+  - [ ] Improve logging capabilities
+  - [ ] Setup use for k8s

@@ -6,9 +6,11 @@ import (
 
 	"github.com/go-pg/pg/v10"
 )
+
 type Resources struct {
-	Logger *log.Logger
-	DB     *pg.DB
+	Logger    *log.Logger
+	DB        *pg.DB
+	SharedKey string
 }
 
 func NewResources(c *Config) (*Resources, error) {
@@ -20,6 +22,6 @@ func NewResources(c *Config) (*Resources, error) {
 	logger := log.New(os.Stdout, "api: ", log.LstdFlags|log.Lshortfile)
 
 	return &Resources{
-		logger, db,
+		logger, db, c.JWTSecret,
 	}, nil
 }

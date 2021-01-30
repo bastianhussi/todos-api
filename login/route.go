@@ -8,8 +8,20 @@ import (
 	"github.com/go-pg/pg/v10"
 )
 
-var res *api.Resources
+type Handler struct {
+	res *api.Resources
+}
 
+func NewHandler(res *api.Resources) *Handler {
+	return &Handler{res}
+}
+
+func (h *Handler) RegisterRoute(s *api.Server) {
+	s.AddHandler([]string{"/login"}, h.Login, "POST")
+}
+
+// TODO: only create goroutines if two or more tasks can be run in parallel
+// TODO: context cancellation with select-statements are only necessary in goroutines
 func (h *Handler) post(w http.ResponseWriter, r *http.Request, c chan<- struct{}) {
 	ctx := r.Context()
 
@@ -20,7 +32,7 @@ func (h *Handler) post(w http.ResponseWriter, r *http.Request, c chan<- struct{}
 		return
 	}
 
-	conn := res.DB.Conn()
+	conn := h.res.DB.Conn()
 	defer conn.Close()
 
 	// TODO: use a goroutine instead
@@ -69,16 +81,4 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		err := ctx.Err()
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-}
-
-type Handler struct {
-	res *api.Resources
-}
-
-func NewHandler(res *api.Resources) *Handler {
-	return &Handler{res}
-}
-
-func (h *Handler) RegisterRoute(s *api.Server) {
-	s.AddHandler([]string{"/login"}, h.Login, "POST")
 }

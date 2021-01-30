@@ -26,6 +26,11 @@ func (h *Handler) post(w http.ResponseWriter, r *http.Request, c chan<- struct{}
 		return
 	}
 
+	// TODO: remove these goroutines: There is no benefit in running encrption and the databse insert
+	// in goroutines. The database operation has to wait on the other tasks anyways.
+	// Could use a channel to send the password into the database function but the password is
+	// required very early on in the function.
+
 	// start the encrption of the user password in separate goroutine.
 	passChannel := make(chan string)
 	go encryptPassword(p.Password, passChannel)
@@ -92,7 +97,6 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		panic(ctx.Err().Error())
 	}
 }
-
 
 func (h *Handler) RegisterRoute(s *api.Server) {
 	s.AddHandler([]string{"/register"}, h.Register, "POST")

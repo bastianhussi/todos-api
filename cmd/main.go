@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/bastianhussi/todos-api/login"
+	"github.com/bastianhussi/todos-api/profile"
 	"github.com/bastianhussi/todos-api/register"
 	"github.com/gorilla/mux"
 
@@ -31,6 +32,7 @@ func init() {
 	srv = api.NewServer(res.Logger, config)
 	login.NewHandler(res).RegisterRoute(srv)
 	register.NewHandler(res).RegisterRoute(srv)
+	profile.NewHandler(res).RegisterRoute(srv)
 }
 
 func main() {
