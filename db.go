@@ -55,11 +55,11 @@ func (p *NewProfile) Save(conn *pg.Conn) (*Profile, error) {
 
 // Profile
 type Profile struct {
-	tableName    struct{} `pg:"profiles,alias:profile"`
-	ID           int      `pg:",pk"`
-	Email        string   `pg:",unique" json:"email"`
-	Name         string   `pg:",notnull" json:"name"`
-	PasswordHash string   `pg:",notnull" json:"-"`
+	tableName struct{} `pg:"profiles,alias:profile"`
+	ID        int      `pg:",pk"`
+	Email     string   `pg:",unique" json:"email"`
+	Name      string   `pg:",notnull" json:"name"`
+	Password  string   `pg:",notnull" json:"-"`
 }
 
 func (p *Profile) Public() interface{} {
@@ -71,16 +71,16 @@ func (p *Profile) Public() interface{} {
 }
 
 func (p *Profile) OK() error {
-	if len(p.Name) == 0 {
-		return errors.New("Name is required")
+	if len(p.Email) == 0 {
+		return requiredError("Email")
 	}
 
-	if len(p.Email) == 0 {
-		return errors.New("Email is required")
+	if len(p.Name) == 0 {
+		return requiredError("Name")
 	}
 
 	if len(p.Password) == 0 {
-		return errors.New("Password is required")
+		return requiredError("Password")
 	}
 
 	return nil

@@ -11,7 +11,7 @@ import (
 	"github.com/go-pg/pg/v10"
 )
 
-func WithLogging(l *log.Logger, h http.Handler) http.Handler {
+func WithLogger(l *log.Logger, h http.Handler) http.Handler {
 	return &logwrapper{l, h}
 }
 
@@ -86,7 +86,7 @@ func Auth() Adapter {
 			token := r.Header.Get("Authorization")
 			token = strings.Split(token, "Bearer ")[1]
 
-			if ok := verifyToken(token, "secret", []string{}); !ok {
+			if ok := VerifyJWT(token, "secret", []string{}); !ok {
 				http.Error(w, "Invalid jwt token", http.StatusBadRequest)
 				return
 			}

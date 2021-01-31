@@ -1,92 +1,83 @@
 package profile
 
 import (
-	"encoding/json"
 	"net/http"
 
 	api "github.com/bastianhussi/todos-api"
+	"github.com/go-pg/pg/v10"
 )
 
-type Handler struct {
-	res *api.Resources
+type Handler struct{}
+
+func NewHandler() *Handler {
+	return &Handler{}
 }
 
-func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
-	body, err := json.Marshal(p)
-	must(err)
-
-	w.Header().Add("Content-Type", "application/json; charset=utf-8")
-	// w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(body)
-}
-
-func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	profile, err := fromRequest(r)
-	if err != nil {
+// FIXME: refactor this, so that these methods still implement http.Handler by removing the channel arugment.
+func (h *Handler) Get(w http.ResponseWriter, r *http.Request, ch chan struct{}) {
+	profile := new(api.Profile)
+	if err := api.Decode(r, profile); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
 
-	conn := h.res.DB.Conn()
-	defer conn.Close()
+	// TODO: receive user from DB
+
+	api.Respond(w, r, http.StatusOK, profile)
+}
+
+func (h *Handler) Patch(w http.ResponseWriter, r *http.Request, ch chan struct{}) {
+	ctx := r.Context()
+	id, err := getProfileIDFromRequest(r)
+	if err != nil {
+		respondWithBadRequest(w, err)
+		return
+	}
+
+	profile, err := fromRequest(r)
+	if err != nil {
+		respondWithBadRequest(w, err)
+		return
+	}
+
+	db, _ := ctx.Value("db").(*pg.Conn)
 
 	// FIXME: rollback if one of the tree transaction fails
 
 	// FIXME: changing the email address should require authenticating the new email address.
-	if err := updateProfileInDB(ctx, conn, p.ID, profile); err != nil {
+	if err := updateProfileInDB(ctx, db, id, profile); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
 
 	// FIXME: get updated profile directly from update queries
-	profile, err = getProfileFromDB(ctx, conn, p.ID)
-	must(err)
-
-	body, err := json.Marshal(profile)
-	must(err)
-
-	w.Header().Add("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(body)
+	profile, err = getProfileFromDB(ctx, db, id)
 }
 
-func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+func (h *Handler) Delete(w http.ResponseWriter, r *http.Request, ch chan struct{}) {
 
-	conn := h.res.DB.Conn()
-	defer conn.Close()
-
-	// FIXME: is this always a bad request?
-	if err := deleteProfileFromDB(ctx, conn, p.ID); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	api.Respond(w, r, http.StatusOK, p)
 }
 
-func NewHandler(res *api.Resources) *Handler {
-	return &Handler{res}
+// TODO: Extract this function from this package and move it to the parent package.
+func respondWithBadRequest(w http.ResponseWriter, err error) {
+	http.Error(w, err.Error(), http.StatusBadRequest)
 }
 
-// TODO: use this to add it to the router, by implementing Handler
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	id, err := getProfileIDFromRequest(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	conn := h.res.DB.Conn()
+	ch := make(chan struct{}, 1)
 
-	profile, err := getProfileFromDB(ctx, conn, id)
-	if err != nil {
-		http.Error(w, "Found so such user profile", http.StatusNotFound)
-		return
+	switch r.Method {
+	case http.MethodGet:
+		h.Get(w, r, ch)
+	case http.MethodPatch:
+		h.Patch(w, r, ch)
+	case http.MethodDelete:
+		h.Delete(w, r, ch)
 	}
 
-	// Close the connection already. Not doing so would cause two connections being open for each
-	// request.
-	conn.Close()
-	// default not necessary: Mux already handles method not allowed cases.
-
+	select {
+	case <-ch:
+		return
+	case <-ctx.Done():
+		return
+	}
 }

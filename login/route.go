@@ -9,36 +9,31 @@ import (
 )
 
 type Handler struct {
+	sharedKey string
 }
 
-func NewHandler() *Handler {
-	return &Handler{}
+func NewHandler(k string) *Handler {
+	return &Handler{k}
 }
 
-func (h *Handler) RegisterRoute(s *api.Server) {
-	s.AddHandler([]string{"/login"}, h.Login, "POST")
-}
-
-// TODO: only create goroutines if two or more tasks can be run in parallel
-// TODO: context cancellation with select-statements are only necessary in goroutines
+// NOTE: only create goroutines if two or more tasks can be run in parallel
+// NOTE: context cancellation with select-statements are only necessary in goroutines
 func (h *Handler) post(w http.ResponseWriter, r *http.Request, c chan<- struct{}) {
 	ctx := r.Context()
-
-	p, err := fromRequest(r)
-	if err != nil {
+	profile := new(api.Profile)
+	if err := api.Decode(r, profile); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		c <- struct{}{}
 		return
 	}
 
-	conn := h.res.DB.Conn()
-	defer conn.Close()
+	db, _ := ctx.Value("db").(*pg.Conn)
 
 	// TODO: use a goroutine instead
-	dbProfile, err := receiveUserFromDB(ctx, conn, p.Email)
+	dbProfile, err := receiveUserFromDB(ctx, db, profile.Email)
 	if err != nil {
 		if err == pg.ErrNoRows {
-			http.Error(w, fmt.Sprintf("No profile with email %s found", p.Email), http.StatusNotFound)
+			http.Error(w, fmt.Sprintf("No profile with email %s found", profile.Email), http.StatusNotFound)
 		} else {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		}
@@ -46,23 +41,19 @@ func (h *Handler) post(w http.ResponseWriter, r *http.Request, c chan<- struct{}
 		return
 	}
 
-	tokenRes := make(chan TokenResult)
-	go generateToken(p, tokenRes)
+	token, err := api.GenerateJWT(h.sharedKey, profile.Email)
 
-	res := <-tokenRes
-	if res.err != nil {
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		c <- struct{}{}
 		return
 	}
 
-	if ok := decryptPass(ctx, dbProfile.Password, p.Password); !ok {
+	if ok := decryptPass(ctx, dbProfile.Password, profile.Password); !ok {
 		http.Error(w, "Wrong password! Please try again", http.StatusBadRequest)
 	}
 
-	w.Header().Add("Content-Type", "plain/text; charset=utf-8")
-	w.WriteHeader(http.StatusCreated)
-	_, _ = w.Write([]byte(res.token))
+	api.Respond(w, r, http.StatusCreated, token)
 
 	c <- struct{}{}
 }

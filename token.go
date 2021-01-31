@@ -1,10 +1,13 @@
 package api
 
 import (
+	"time"
+
+	"github.com/square/go-jose/v3"
 	"github.com/square/go-jose/v3/jwt"
 )
 
-func verifyToken(raw string, sharedKey string, audience []string) bool {
+func VerifyJWT(raw string, sharedKey string, audience []string) bool {
 	token, err := jwt.ParseSigned(raw)
 	if err != nil {
 		return false
@@ -25,4 +28,26 @@ func verifyToken(raw string, sharedKey string, audience []string) bool {
 	}
 
 	return true
+}
+
+func GenerateJWT(sharedKey string, audience ...string) (string, error) {
+	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.HS512, Key: sharedKey},
+		(&jose.SignerOptions{}).WithType("JWT"))
+	if err != nil {
+		return "", err
+	}
+
+	claims := jwt.Claims{
+		Subject:   "subject",
+		Issuer:    "issuer",
+		Audience:  audience,
+		NotBefore: jwt.NewNumericDate(time.Now()),
+		Expiry:    jwt.NewNumericDate(time.Now().Add(30 * time.Minute)),
+	}
+	token, err := jwt.Signed(sig).Claims(claims).CompactSerialize()
+	if err != nil {
+		return "", err
+	}
+
+	return token, nil
 }

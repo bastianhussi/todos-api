@@ -1,6 +1,7 @@
 * TODO: Refactoring
-  - [ ] Add CRUD operations for profiles as methods to the profile struct. (Insert, update,
+  - [-] Add CRUD operations for profiles as methods to the profile struct. (Insert, update,
     delete, ...)
+  - [ ] Add support for new way of sharing resources using wrappers and context
   - [ ] Remove unnecessary goroutines
   - [ ] Make every goroutine check the context for cancellation
   - [-] Create a auth middleware (might require further refactoring)

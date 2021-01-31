@@ -3,22 +3,22 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/bastianhussi/todos-api/register"
+	"github.com/go-pg/pg/v10"
+	"github.com/gorilla/mux"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
-
-	"github.com/go-pg/pg/v10"
-	"github.com/gorilla/mux"
 
 	api "github.com/bastianhussi/todos-api"
 	"github.com/bastianhussi/todos-api/login"
-	"github.com/bastianhussi/todos-api/register"
+	"github.com/bastianhussi/todos-api/profile"
 )
 
 var (
+	config *api.Config
 	router *mux.Router
 	srv    *http.Server
 	logger *log.Logger
@@ -42,11 +42,12 @@ func init() {
 
 	router := mux.NewRouter().StrictSlash(true)
 
-	loginHandle := api.WithLogging(logger, api.WithDB(db, login.NewHandler()))
-	registerHandle := api.WithLogging(logger, api.WithDB(db, register.NewHandler()))
-
-	router.Handle("/login", loginHandle).Methods(http.MethodPost)
-	router.Handle("/register", registerHandle).Methods(http.MethodPost)
+	// TODO: add profile route and use the auth adapter
+	addHandle(router, []string{"/login"}, login.NewHandler(config.SharedKey), http.MethodPost)
+	addHandle(router, []string{"/register"}, register.NewHandler(), http.MethodPost)
+	addHandle(router, []string{"/profile/{id}", "/p/{id}"}, api.Adapt(profile.NewHandler(),
+		api.Auth()), http.MethodGet,
+		http.MethodPatch, http.MethodDelete)
 
 	srv = &http.Server{
 		Addr:         fmt.Sprintf(":%d", config.Port),
@@ -57,9 +58,18 @@ func init() {
 	}
 }
 
+// little helper functions that registers handles and adds the WithLogger and WithDB wrappers
+//around them.
+func addHandle(r *mux.Router, paths []string, h http.Handler, methods ...string) {
+	for _, p := range paths {
+		r.Handle(p, api.WithLogger(logger, api.WithDB(db, h))).Methods(methods...)
+	}
+}
+
 func main() {
 	defer db.Close()
 
+	// start the http server in a separate goroutine.
 	go func() {
 		logger.Printf("Server is running on %s 🚀\n", srv.Addr)
 		if err := srv.ListenAndServe(); err == http.ErrServerClosed {
@@ -72,11 +82,15 @@ func main() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
+	// Wait for a signal to stop
 	<-stop
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// create context with a timeout
+	ctx, cancel := context.WithTimeout(context.Background(), config.Timeout.Shutdown)
 	defer cancel()
 
+	// try to shut the server down graceful by stop accepting incoming requests and finishing the
+	//remaining ones. After the timeout finished kill the server.
 	if err := srv.Shutdown(ctx); err != nil {
 		logger.Fatal(err)
 	}
