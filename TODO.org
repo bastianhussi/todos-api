@@ -1,7 +1,9 @@
 * TODO: Refactoring
+  - [ ] Add CRUD operations for profiles as methods to the profile struct. (Insert, update,
+    delete, ...)
   - [ ] Remove unnecessary goroutines
   - [ ] Make every goroutine check the context for cancellation
-  - [ ] Create a auth middleware (might require further refactoring)
+  - [-] Create a auth middleware (might require further refactoring)
   - [ ] Write way more unit tests (jwt, database, e.g. totally uncovered at the moment)
   - [ ] Add more comments
 * TODO: Functional Updates
@@ -10,5 +12,5 @@
   - [X] Create a /profile route for account management
   - [ ] Create a /todos route and todo-managemnt
   - [ ] Add 2-factor auth like OTP
-  - [ ] Improve logging capabilities
+  - [ ] Add opentelemetry support (works with go-pg as well)
   - [ ] Setup use for k8s

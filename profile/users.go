@@ -2,7 +2,9 @@ package profile
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"io/ioutil"
 	"net/http"
 	"strconv"
 
@@ -11,22 +13,59 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func getProfileIDFromRequest(r *http.Request) (uint64, error) {
+// fromRequest extracts the profile from the users request. NOTE: this does not check if any fields
+// are provided. Default / nil values are allowed.
+func fromRequest(r *http.Request) (*api.Profile, error) {
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	p := new(api.Profile)
+
+	// Deserialize the json data. NOTE: Values can be nil / have the default type value.
+	if err := json.Unmarshal(body, p); err != nil {
+		return nil, err
+	}
+
+	return p, nil
+}
+
+// FIXME: Too many arguments! Maximum number of arguments should be 3.
+func updateProfileInDB(ctx context.Context, conn *pg.Conn, id int, p *api.Profile) error {
+	// TODO: is this really necessary?
+	columns := make([]string, 3)
+	if p.Email != "" {
+		columns = append(columns, "email")
+	}
+	if p.Name != "" {
+		columns = append(columns, "name")
+	}
+	if p.Password != "" {
+		columns = append(columns, "password")
+	}
+
+	_, err := pg.Model(p).Limit(1).Column(columns...).Where("id = ?", id).Update()
+	return err
+}
+
+func getProfileIDFromRequest(r *http.Request) (int, error) {
 	vars := mux.Vars(r)
 	_, ok := vars["id"]
 	if !ok {
 		return 0, errors.New("Please provide a profile id")
 	}
 
-	id, err := strconv.ParseUint(vars["id"], 0, 64)
+	id, err := strconv.ParseInt(vars["id"], 0, 64)
 	if err != nil {
 		return 0, errors.New("Please profile a positive numeric value for the profile id")
 	}
 
-	return id, nil
+	return int(id), nil
 }
 
-func getProfileFromDB(ctx context.Context, conn *pg.Conn, id uint64) (*api.Profile, error) {
+// TODO: Add these functions as methods to the profile struct
+func getProfileFromDB(ctx context.Context, conn *pg.Conn, id int) (*api.Profile, error) {
 	profile := new(api.Profile)
 	if err := conn.ModelContext(ctx, profile).Limit(1).Where("id = ?", id).Select(); err != nil {
 		return nil, err
@@ -35,7 +74,7 @@ func getProfileFromDB(ctx context.Context, conn *pg.Conn, id uint64) (*api.Profi
 	return profile, nil
 }
 
-func deleteProfileFromDB(ctx context.Context, conn *pg.Conn, id uint64) error {
+func deleteProfileFromDB(ctx context.Context, conn *pg.Conn, id int) error {
 	profile := new(api.Profile)
 	if _, err := conn.ModelContext(ctx, profile).Limit(1).Where("id = ?", id).Delete(); err != nil {
 		if err != nil {

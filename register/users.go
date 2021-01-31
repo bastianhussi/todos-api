@@ -17,6 +17,7 @@ type dbResult struct {
 	err error
 }
 
+// TODO: return the inserted id!
 // saveUserInDB tries to write the given user profile to the database.
 // The transaction is not beeing committed in this function scope, instead the transaction handles
 // is beeing send into the channel. If the insert already fails it will be rolled back and
