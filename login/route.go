@@ -9,11 +9,10 @@ import (
 )
 
 type Handler struct {
-	res *api.Resources
 }
 
-func NewHandler(res *api.Resources) *Handler {
-	return &Handler{res}
+func NewHandler() *Handler {
+	return &Handler{}
 }
 
 func (h *Handler) RegisterRoute(s *api.Server) {
@@ -68,7 +67,7 @@ func (h *Handler) post(w http.ResponseWriter, r *http.Request, c chan<- struct{}
 	c <- struct{}{}
 }
 
-func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	c := make(chan struct{})

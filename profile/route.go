@@ -11,7 +11,7 @@ type Handler struct {
 	res *api.Resources
 }
 
-func (h *Handler) get(w http.ResponseWriter, r *http.Request, p *api.Profile) {
+func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	body, err := json.Marshal(p)
 	must(err)
 
@@ -20,7 +20,7 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request, p *api.Profile) {
 	_, _ = w.Write(body)
 }
 
-func (h *Handler) patch(w http.ResponseWriter, r *http.Request, p *api.Profile) {
+func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	profile, err := fromRequest(r)
 	if err != nil {
@@ -49,7 +49,7 @@ func (h *Handler) patch(w http.ResponseWriter, r *http.Request, p *api.Profile) 
 	_, _ = w.Write(body)
 }
 
-func (h *Handler) delete(w http.ResponseWriter, r *http.Request, p *api.Profile) {
+func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	conn := h.res.DB.Conn()
@@ -61,15 +61,15 @@ func (h *Handler) delete(w http.ResponseWriter, r *http.Request, p *api.Profile)
 		return
 	}
 
-	body, err := json.Marshal(p)
-	must(err)
-
-	w.Header().Add("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(body)
+	api.Respond(w, r, http.StatusOK, p)
 }
 
-func (h *Handler) Profile(w http.ResponseWriter, r *http.Request) {
+func NewHandler(res *api.Resources) *Handler {
+	return &Handler{res}
+}
+
+// TODO: use this to add it to the router, by implementing Handler
+func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id, err := getProfileIDFromRequest(r)
 	if err != nil {
@@ -87,28 +87,6 @@ func (h *Handler) Profile(w http.ResponseWriter, r *http.Request) {
 	// Close the connection already. Not doing so would cause two connections being open for each
 	// request.
 	conn.Close()
-
-	switch r.Method {
-	case http.MethodGet:
-		h.get(w, r, profile)
-	case http.MethodPatch:
-		h.patch(w, r, profile)
-	case http.MethodDelete:
-		h.delete(w, r, profile)
-	}
 	// default not necessary: Mux already handles method not allowed cases.
-}
 
-func NewHandler(res *api.Resources) *Handler {
-	return &Handler{res}
-}
-
-func (h *Handler) RegisterRoute(s *api.Server) {
-	s.AddHandler([]string{"/profiles/{id}", "/p/{id}"}, h.Profile, http.MethodGet, http.MethodPatch, http.MethodDelete)
-}
-
-func must(err error) {
-	if err != nil {
-		panic(err)
-	}
 }

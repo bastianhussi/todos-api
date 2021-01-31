@@ -8,9 +8,7 @@ import (
 	"github.com/go-pg/pg/v10"
 )
 
-type Handler struct {
-	res *api.Resources
-}
+type Handler struct{}
 
 // TODO: refactor this method. It should be stripped-down.
 // post handles the incoming post request. When the request has been processed
@@ -19,7 +17,13 @@ func (h *Handler) post(w http.ResponseWriter, r *http.Request, c chan<- struct{}
 	defer r.Body.Close()
 	ctx := r.Context()
 
-	p, err := fromRequest(r)
+	db, ok := ctx.Value("db").(*pg.Conn)
+	if !ok {
+		panic("No db")
+	}
+
+	profile := new(api.Profile)
+	err := api.Decode(r, profile)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		c <- struct{}{}
@@ -37,13 +41,11 @@ func (h *Handler) post(w http.ResponseWriter, r *http.Request, c chan<- struct{}
 
 	// create a new database connection
 	// FIXME: can this operation block if a lot of conns are open? Use a goroutine instead?
-	conn := h.res.DB.Conn()
-	defer conn.Close()
 	dbChannel := make(chan dbResult)
 
 	// receive the encrypted password before writing it to the database.
 	p.Password = <-passChannel
-	go saveUserInDB(ctx, conn, p, dbChannel)
+	go saveUserInDB(ctx, db, p, dbChannel)
 
 	// TODO: extract this into an other function.
 	// This method should not handle the cancellation of this task.
@@ -77,14 +79,16 @@ func (h *Handler) post(w http.ResponseWriter, r *http.Request, c chan<- struct{}
 		return
 	}
 
-	w.Header().Add("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(http.StatusCreated)
-	_, _ = fmt.Fprintf(w, "Profile succesfully created")
+	api.Respond(w, r, http.StatusCreated, interface{})
 
 	c <- struct{}{}
 }
 
-func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
+func NewHandler() *Handler {
+	return &Handler{}
+}
+
+func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	c := make(chan struct{}, 1)
@@ -95,21 +99,5 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	case <-ctx.Done():
 		panic(ctx.Err().Error())
-	}
-}
-
-func (h *Handler) RegisterRoute(s *api.Server) {
-	s.AddHandler([]string{"/register"}, h.Register, "POST")
-}
-
-func NewHandler(res *api.Resources) *Handler {
-	return &Handler{res}
-}
-
-// little helperfunction which causes a panic if the error is not nil.
-// NOTE: This should only be used for functions that can recover from panics.
-func must(err error) {
-	if err != nil {
-		panic(err)
 	}
 }

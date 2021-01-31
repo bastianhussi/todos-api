@@ -51,10 +51,6 @@ func updateProfileInDB(ctx context.Context, conn *pg.Conn, id int, p *api.Profil
 
 func getProfileIDFromRequest(r *http.Request) (int, error) {
 	vars := mux.Vars(r)
-	_, ok := vars["id"]
-	if !ok {
-		return 0, errors.New("Please provide a profile id")
-	}
 
 	id, err := strconv.ParseInt(vars["id"], 0, 64)
 	if err != nil {

@@ -48,33 +48,3 @@ func encryptPassword(p string, c chan<- string) {
 	must(err)
 	c <- string(encryptPass)
 }
-
-// fromRequest extracts a user profile from the body of a http request.
-// The profile is returned if the format is correct and all required fields exist.
-// If not an error is returned.
-func fromRequest(r *http.Request) (*api.Profile, error) {
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	p := new(api.Profile)
-
-	// Deserialize the json data. NOTE: Values can be nil / have the default type value.
-	if err := json.Unmarshal(body, p); err != nil {
-		return nil, err
-	}
-
-	// Check if all required fields are set.
-	if p.Email == "" {
-		return nil, errors.New("Please provide an email address")
-	}
-	if p.Name == "" {
-		return nil, errors.New("Please provide a profile name")
-	}
-	if p.Password == "" {
-		return nil, errors.New("Please provide a password")
-	}
-
-	return p, nil
-}
