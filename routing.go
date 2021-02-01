@@ -45,10 +45,9 @@ func LoggerFromContext(ctx context.Context) *log.Logger {
 
 func (l *logwrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	ctx = context.WithValue(ctx, "logger", l.logger)
-	r.WithContext(ctx)
-
-	l.handler.ServeHTTP(w, r)
+	ctx = context.WithValue(ctx, loggerKey, l.logger)
+	
+	l.handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
 func WithDB(d *pg.DB, h http.Handler) http.Handler {
@@ -72,9 +71,8 @@ func (d *dbwrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 	ctx = context.WithValue(ctx, dbKey, conn)
-	r.WithContext(ctx)
-
-	d.handler.ServeHTTP(w, r)
+	
+	d.handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
 type Adapter func(http.Handler) http.Handler
@@ -85,6 +83,7 @@ func Logging(l *log.Logger) Adapter {
 			start := time.Now()
 			l.Printf("Got %s request at %s\n", r.Method, r.URL.Path)
 			h.ServeHTTP(w, r)
+			// TODO: summarize response
 			l.Printf("Request processed in %s\n", time.Since(start))
 		})
 	}
@@ -100,7 +99,6 @@ func Recover(l *log.Logger) Adapter {
 					http.Error(w, "Oh noo, something went wrong 🤯", http.StatusInternalServerError)
 				}
 			}()
-
 			h.ServeHTTP(w, r)
 		})
 	}

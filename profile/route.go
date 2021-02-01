@@ -2,8 +2,10 @@ package profile
 
 import (
 	"net/http"
+	"strconv"
 
 	api "github.com/bastianhussi/todos-api"
+	"github.com/gorilla/mux"
 )
 
 type Handler struct{}
@@ -13,7 +15,7 @@ func NewHandler() *Handler {
 }
 
 // FIXME: refactor this, so that these methods still implement http.Handler by removing the channel arugment.
-func (h *Handler) Get(w http.ResponseWriter, r *http.Request, ch chan struct{}) {
+func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	profile := new(api.Profile)
 	if err := api.Decode(r, profile); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -24,7 +26,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request, ch chan struct{}) 
 	api.Respond(w, r, http.StatusOK, profile)
 }
 
-func (h *Handler) Patch(w http.ResponseWriter, r *http.Request, ch chan struct{}) {
+func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	conn := api.DBFromContext(ctx)
 
@@ -34,16 +36,17 @@ func (h *Handler) Patch(w http.ResponseWriter, r *http.Request, ch chan struct{}
 		return
 	}
 
-	id, err := getProfileIDFromRequest(r)
+	vars := mux.Vars(r)
+
+	id, err := strconv.ParseInt(vars["id"], 0, 64)
 	if err != nil {
 		respondWithBadRequest(w, err)
 		return
 	}
 
-	dbProfile, err := api.GetProfileByID(ctx, conn, id)
+	dbProfile, err := api.GetProfileByID(ctx, conn, int(id))
 
 	// FIXME: rollback if one of the tree transaction fails
-
 	// FIXME: changing the email address should require authenticating the new email address.
 	if err := dbProfile.Update(ctx, conn, reqProfile); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -52,7 +55,7 @@ func (h *Handler) Patch(w http.ResponseWriter, r *http.Request, ch chan struct{}
 	api.Respond(w, r, http.StatusOK, dbProfile)
 }
 
-func (h *Handler) Delete(w http.ResponseWriter, r *http.Request, ch chan struct{}) {
+func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 
 }
 
@@ -67,11 +70,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet:
-		h.Get(w, r, ch)
+		h.Get(w, r)
 	case http.MethodPatch:
-		h.Patch(w, r, ch)
+		h.Patch(w, r)
 	case http.MethodDelete:
-		h.Delete(w, r, ch)
+		h.Delete(w, r)
 	}
 
 	// FIXME: Does this work? Is there a more elegant solution?

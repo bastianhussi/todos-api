@@ -3,14 +3,15 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/bastianhussi/todos-api/register"
-	"github.com/go-pg/pg/v10"
-	"github.com/gorilla/mux"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/bastianhussi/todos-api/register"
+	"github.com/go-pg/pg/v10"
+	"github.com/gorilla/mux"
 
 	api "github.com/bastianhussi/todos-api"
 	"github.com/bastianhussi/todos-api/login"
@@ -18,6 +19,7 @@ import (
 )
 
 var (
+	ctx    = context.Background()
 	config *api.Config
 	router *mux.Router
 	srv    *http.Server
@@ -25,10 +27,12 @@ var (
 	db     *pg.DB
 )
 
-var ctx = context.Background()
-
 func init() {
-	config, err := api.NewConfig()
+	var err error
+
+	// if err would not been declared before config would only be shadow in this functions scope,
+	// but then be nil in the main-functions scope
+	config, err = api.NewConfig()
 	api.Must(err)
 
 	db, err = api.NewDB(ctx, config)
@@ -36,11 +40,11 @@ func init() {
 	conn := db.Conn()
 	defer conn.Close()
 
-	logger := log.New(os.Stdout, "api: ", log.LstdFlags|log.Lshortfile)
+	logger = log.New(os.Stdout, "api: ", log.LstdFlags|log.Lshortfile)
 
 	api.Must(api.CreateSchema(conn))
 
-	router := mux.NewRouter().StrictSlash(true)
+	router = mux.NewRouter().StrictSlash(true)
 
 	// TODO: add profile route and use the auth adapter
 	addHandle(router, []string{"/login"}, login.NewHandler(config.SharedKey), http.MethodPost)
@@ -50,7 +54,7 @@ func init() {
 		http.MethodPatch, http.MethodDelete)
 
 	srv = &http.Server{
-		Addr:         fmt.Sprintf(":%d", config.Port),
+		Addr:         fmt.Sprintf("127.0.0.1:%d", config.Port),
 		WriteTimeout: config.Timeout.Write,
 		ReadTimeout:  config.Timeout.Read,
 		IdleTimeout:  config.Timeout.Idle,
@@ -68,10 +72,10 @@ func addHandle(r *mux.Router, paths []string, h http.Handler, methods ...string)
 
 func main() {
 	defer db.Close()
+	logger.Printf("Server is running on %s 🚀\n", srv.Addr)
 
 	// start the http server in a separate goroutine.
 	go func() {
-		logger.Printf("Server is running on %s 🚀\n", srv.Addr)
 		if err := srv.ListenAndServe(); err == http.ErrServerClosed {
 			logger.Println("Server stopped 🛑")
 		} else {
@@ -86,7 +90,7 @@ func main() {
 	<-stop
 
 	// create context with a timeout
-	ctx, cancel := context.WithTimeout(context.Background(), config.Timeout.Shutdown)
+	ctx, cancel := context.WithTimeout(ctx, config.Timeout.Shutdown)
 	defer cancel()
 
 	// try to shut the server down graceful by stop accepting incoming requests and finishing the
