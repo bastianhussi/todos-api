@@ -1,6 +1,7 @@
 package register
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -57,9 +58,11 @@ func (h *Handler) post(w http.ResponseWriter, r *http.Request, c chan<- struct{}
 		err = func(tx *pg.Tx, err error) error {
 			// Could not commit: The transaction was already rolled back.
 			if err != nil {
-				pgErr, ok := err.(pg.Error)
-				if ok && pgErr.IntegrityViolation() {
-					return fmt.Errorf("profile with email %s already exists", p.Email)
+				var pgErr pg.Error
+				if errors.As(err, pgErr) {
+					if ok && pgErr.IntegrityViolation() {
+						return fmt.Errorf("profile with email %s already exists", p.Email)
+					}
 				}
 				panic(err)
 			} else {

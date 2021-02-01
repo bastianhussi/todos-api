@@ -11,23 +11,36 @@ import (
 	"github.com/go-pg/pg/v10"
 )
 
-func WithLogger(l *log.Logger, h http.Handler) http.Handler {
-	return &logwrapper{l, h}
-}
-
 type (
+	key int
+
 	logwrapper struct {
 		logger  *log.Logger
 		handler http.Handler
 	}
+
 	dbwrapper struct {
 		dbSession *pg.DB
 		handler   http.Handler
 	}
 )
 
-func WithDB(d *pg.DB, h http.Handler) http.Handler {
-	return &dbwrapper{d, h}
+const (
+	dbKey     key = 0
+	loggerKey key = 1
+)
+
+func WithLogger(l *log.Logger, h http.Handler) http.Handler {
+	return &logwrapper{l, h}
+}
+
+func LoggerFromContext(ctx context.Context) *log.Logger {
+	logger, ok := ctx.Value(loggerKey).(*log.Logger)
+	if !ok {
+		panic("Could not receive the logger from the context of this request")
+	}
+
+	return logger
 }
 
 func (l *logwrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -38,6 +51,19 @@ func (l *logwrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	l.handler.ServeHTTP(w, r)
 }
 
+func WithDB(d *pg.DB, h http.Handler) http.Handler {
+	return &dbwrapper{d, h}
+}
+
+func DBFromContext(ctx context.Context) *pg.Conn {
+	conn, ok := ctx.Value(dbKey).(*pg.Conn)
+	if !ok {
+		panic("Could not receive the database connection from the context of this request")
+	}
+
+	return conn
+}
+
 // Provide a open db connection for each request using this and make sure the connection is closed
 // when finished
 func (d *dbwrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -45,7 +71,7 @@ func (d *dbwrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer conn.Close()
 
 	ctx := r.Context()
-	ctx = context.WithValue(ctx, "db", conn)
+	ctx = context.WithValue(ctx, dbKey, conn)
 	r.WithContext(ctx)
 
 	d.handler.ServeHTTP(w, r)
@@ -111,17 +137,11 @@ func Respond(w http.ResponseWriter, r *http.Request, status int, data interface{
 	}
 
 	body, err := json.Marshal(data)
-	must(err)
+	Must(err)
 
 	w.Header().Add("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	_, _ = w.Write(body)
-}
-
-func must(err error) {
-	if err != nil {
-		panic(err)
-	}
 }
 
 func Decode(r *http.Request, v interface{}) error {

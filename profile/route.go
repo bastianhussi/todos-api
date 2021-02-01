@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	api "github.com/bastianhussi/todos-api"
-	"github.com/go-pg/pg/v10"
 )
 
 type Handler struct{}
@@ -27,29 +26,30 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request, ch chan struct{}) 
 
 func (h *Handler) Patch(w http.ResponseWriter, r *http.Request, ch chan struct{}) {
 	ctx := r.Context()
+	conn := api.DBFromContext(ctx)
+
+	reqProfile := new(api.Profile)
+	if err := api.Decode(r, reqProfile); err != nil {
+		respondWithBadRequest(w, err)
+		return
+	}
+
 	id, err := getProfileIDFromRequest(r)
 	if err != nil {
 		respondWithBadRequest(w, err)
 		return
 	}
 
-	profile, err := fromRequest(r)
-	if err != nil {
-		respondWithBadRequest(w, err)
-		return
-	}
-
-	db, _ := ctx.Value("db").(*pg.Conn)
+	dbProfile, err := api.GetProfileByID(ctx, conn, id)
 
 	// FIXME: rollback if one of the tree transaction fails
 
 	// FIXME: changing the email address should require authenticating the new email address.
-	if err := updateProfileInDB(ctx, db, id, profile); err != nil {
+	if err := dbProfile.Update(ctx, conn, reqProfile); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
 
-	// FIXME: get updated profile directly from update queries
-	profile, err = getProfileFromDB(ctx, db, id)
+	api.Respond(w, r, http.StatusOK, dbProfile)
 }
 
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request, ch chan struct{}) {
@@ -74,10 +74,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.Delete(w, r, ch)
 	}
 
+	// FIXME: Does this work? Is there a more elegant solution?
 	select {
 	case <-ch:
 		return
 	case <-ctx.Done():
+		logger := api.LoggerFromContext(ctx)
+		logger.Printf("Request was canceled by the client: %s", ctx.Err().Error())
 		return
 	}
 }
