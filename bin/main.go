@@ -13,7 +13,7 @@ import (
 	"github.com/go-pg/pg/v10"
 	"github.com/gorilla/mux"
 
-	api "github.com/bastianhussi/todos-api"
+	"github.com/bastianhussi/todos-api"
 	"github.com/bastianhussi/todos-api/login"
 	"github.com/bastianhussi/todos-api/profile"
 )

@@ -16,14 +16,23 @@ func NewHandler() *Handler {
 
 // FIXME: refactor this, so that these methods still implement http.Handler by removing the channel arugment.
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
-	profile := new(api.Profile)
-	if err := api.Decode(r, profile); err != nil {
+	ctx := r.Context()
+	db := api.DBFromContext(ctx)
+
+	vars := mux.Vars(r)
+
+	id, err := strconv.ParseInt(vars["id"], 0, 64)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
-	// TODO: receive user from DB
-
-	api.Respond(w, r, http.StatusOK, profile)
+	profile, err := api.GetProfileByID(ctx, db, int(id))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	api.Respond(w, http.StatusOK, profile)
 }
 
 func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
@@ -32,7 +41,7 @@ func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 
 	reqProfile := new(api.Profile)
 	if err := api.Decode(r, reqProfile); err != nil {
-		respondWithBadRequest(w, err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -40,7 +49,7 @@ func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 
 	id, err := strconv.ParseInt(vars["id"], 0, 64)
 	if err != nil {
-		respondWithBadRequest(w, err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -52,22 +61,36 @@ func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
 
-	api.Respond(w, r, http.StatusOK, dbProfile)
+	api.Respond(w, http.StatusOK, dbProfile)
 }
 
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	conn := api.DBFromContext(ctx)
 
-}
+	vars := mux.Vars(r)
 
-// TODO: Extract this function from this package and move it to the parent package.
-func respondWithBadRequest(w http.ResponseWriter, err error) {
-	http.Error(w, err.Error(), http.StatusBadRequest)
+	id, err := strconv.ParseInt(vars["id"], 0, 64)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	profile, err := api.GetProfileByID(ctx, conn, int(id))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	if err := profile.Delete(ctx, conn); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	api.Respond(w, http.StatusOK, profile)
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	ch := make(chan struct{}, 1)
-
 	switch r.Method {
 	case http.MethodGet:
 		h.Get(w, r)
@@ -75,15 +98,5 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.Patch(w, r)
 	case http.MethodDelete:
 		h.Delete(w, r)
-	}
-
-	// FIXME: Does this work? Is there a more elegant solution?
-	select {
-	case <-ch:
-		return
-	case <-ctx.Done():
-		logger := api.LoggerFromContext(ctx)
-		logger.Printf("Request was canceled by the client: %s", ctx.Err().Error())
-		return
 	}
 }

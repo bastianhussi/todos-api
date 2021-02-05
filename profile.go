@@ -55,9 +55,8 @@ func (p *NewProfile) Insert(ctx context.Context, conn *pg.Conn) (*Profile, error
 		_ = tx.Rollback()
 		return nil, err
 	}
-	// FIXME: Do not commit here already, return the transaction handler.
-	tx.Commit()
 
+	tx.Commit()
 	return profile, nil
 }
 
@@ -108,7 +107,7 @@ func GetProfileByID(ctx context.Context, conn *pg.Conn, id int) (*Profile, error
 
 // GetProfileByEmail searches the database for a user profile with the given email address and
 // returns the record if it exists.
-func GetProfileByEmail(ctx context.Context, conn *pg.Conn, email int) (*Profile, error) {
+func GetProfileByEmail(ctx context.Context, conn *pg.Conn, email string) (*Profile, error) {
 	profile := new(Profile)
 	err := conn.ModelContext(ctx, profile).Limit(1).Where("email = ?", email).Select()
 	if err != nil {

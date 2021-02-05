@@ -25,17 +25,15 @@ func receiveUserFromDB(ctx context.Context, conn *pg.Conn, email string) (*api.P
 }
 
 func decryptPass(ctx context.Context, hashedPass string, pass string) bool {
-	c := make(chan error, 1)
-	go func() {
-		c <- bcrypt.CompareHashAndPassword([]byte(hashedPass), []byte(pass))
-	}()
-
-	select {
-	case err := <-c:
-		return err == nil
-	case <-ctx.Done():
+	if ctx.Err() != nil {
 		return false
 	}
+
+	if bcrypt.CompareHashAndPassword([]byte(hashedPass), []byte(pass)) != nil {
+		return false
+	}
+
+	return true
 }
 
 func fromRequest(r *http.Request) (*api.Profile, error) {

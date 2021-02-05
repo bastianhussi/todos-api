@@ -34,33 +34,15 @@ func WithLogger(l *log.Logger, h http.Handler) http.Handler {
 	return &logwrapper{l, h}
 }
 
-func LoggerFromContext(ctx context.Context) *log.Logger {
-	logger, ok := ctx.Value(loggerKey).(*log.Logger)
-	if !ok {
-		panic("Could not receive the logger from the context of this request")
-	}
-
-	return logger
-}
-
 func (l *logwrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	ctx = context.WithValue(ctx, loggerKey, l.logger)
-	
+
 	l.handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
 func WithDB(d *pg.DB, h http.Handler) http.Handler {
 	return &dbwrapper{d, h}
-}
-
-func DBFromContext(ctx context.Context) *pg.Conn {
-	conn, ok := ctx.Value(dbKey).(*pg.Conn)
-	if !ok {
-		panic("Could not receive the database connection from the context of this request")
-	}
-
-	return conn
 }
 
 // Provide a open db connection for each request using this and make sure the connection is closed
@@ -71,8 +53,26 @@ func (d *dbwrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 	ctx = context.WithValue(ctx, dbKey, conn)
-	
+
 	d.handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+func LoggerFromContext(ctx context.Context) *log.Logger {
+	logger, ok := ctx.Value(loggerKey).(*log.Logger)
+	if !ok {
+		panic("Could not receive the logger from the context of this request")
+	}
+
+	return logger
+}
+
+func DBFromContext(ctx context.Context) *pg.Conn {
+	conn, ok := ctx.Value(dbKey).(*pg.Conn)
+	if !ok {
+		panic("Could not receive the database connection from the context of this request")
+	}
+
+	return conn
 }
 
 type Adapter func(http.Handler) http.Handler
@@ -89,7 +89,6 @@ func Logging(l *log.Logger) Adapter {
 	}
 }
 
-// TODO: does this work like this? (Using it as the outermost adapter)
 func Recover(l *log.Logger) Adapter {
 	return func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -128,7 +127,7 @@ func Adapt(h http.Handler, adapters ...Adapter) http.Handler {
 	return h
 }
 
-func Respond(w http.ResponseWriter, r *http.Request, status int, data interface{}) {
+func Respond(w http.ResponseWriter, status int, data interface{}) {
 	// If the data implements the Public interface use it to prevent exposing sensitive data.
 	if obj, ok := data.(Public); ok {
 		data = obj

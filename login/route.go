@@ -1,11 +1,9 @@
 package login
 
 import (
-	"fmt"
 	"net/http"
 
-	api "github.com/bastianhussi/todos-api"
-	"github.com/go-pg/pg/v10"
+	"github.com/bastianhussi/todos-api"
 )
 
 type Handler struct {
@@ -16,36 +14,27 @@ func NewHandler(k string) *Handler {
 	return &Handler{k}
 }
 
-// NOTE: only create goroutines if two or more tasks can be run in parallel
-// NOTE: context cancellation with select-statements are only necessary in goroutines
-func (h *Handler) post(w http.ResponseWriter, r *http.Request, c chan<- struct{}) {
+func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	profile := new(api.Profile)
 	if err := api.Decode(r, profile); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		c <- struct{}{}
 		return
 	}
 
-	db, _ := ctx.Value("db").(*pg.Conn)
-
-	// TODO: use a goroutine instead
-	dbProfile, err := receiveUserFromDB(ctx, db, profile.Email)
+	db := api.DBFromContext(ctx)
+	dbProfile, err := api.GetProfileByEmail(ctx, db, profile.Email)
 	if err != nil {
-		if err == pg.ErrNoRows {
-			http.Error(w, fmt.Sprintf("No profile with email %s found", profile.Email), http.StatusNotFound)
-		} else {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-		}
-		c <- struct{}{}
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
+	// TODO: execute both in parallel
 
 	token, err := api.GenerateJWT(h.sharedKey, profile.Email)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		c <- struct{}{}
 		return
 	}
 
@@ -53,22 +42,5 @@ func (h *Handler) post(w http.ResponseWriter, r *http.Request, c chan<- struct{}
 		http.Error(w, "Wrong password! Please try again", http.StatusBadRequest)
 	}
 
-	api.Respond(w, r, http.StatusCreated, token)
-
-	c <- struct{}{}
-}
-
-func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	c := make(chan struct{})
-	go h.post(w, r, c)
-
-	select {
-	case <-c:
-		return
-	case <-ctx.Done():
-		err := ctx.Err()
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+	api.Respond(w, http.StatusCreated, token)
 }
