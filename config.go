@@ -29,8 +29,14 @@ func NewConfig() (*Config, error) {
 	c := new(Config)
 
 	// Use environment variables as well
+
+	// FIXME: Turn off in production
+	viper.WatchConfig()
 	viper.AutomaticEnv()
-	viper.SetConfigFile("./config.yml")
+
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath(".")
 
 	// Read the file
 	if err := viper.ReadInConfig(); err != nil {

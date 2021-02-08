@@ -103,13 +103,14 @@ func Recover(l *log.Logger) Adapter {
 	}
 }
 
-func Auth() Adapter {
+func Auth(sharedKey []byte) Adapter {
 	return func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			token := r.Header.Get("Authorization")
+			// FIXME: handle missing token
 			token = strings.Split(token, "Bearer ")[1]
 
-			if ok := VerifyJWT(token, "secret", []string{}); !ok {
+			if ok := VerifyJWT(token, sharedKey, []string{}); !ok {
 				http.Error(w, "Invalid jwt token", http.StatusBadRequest)
 				return
 			}
@@ -141,10 +142,14 @@ func Respond(w http.ResponseWriter, status int, data interface{}) {
 	_, _ = w.Write(body)
 }
 
-func Decode(r *http.Request, v interface{}) error {
+func Decode(r *http.Request, v interface{ OK() error }) error {
 	// This can check if the OK method on a struct returns an error.
 	// We can check if required fields are given this way.
-	if err := json.NewDecoder(r.Body).Decode(&v); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
+		return err
+	}
+
+	if err := v.OK(); err != nil {
 		return err
 	}
 

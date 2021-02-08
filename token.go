@@ -7,14 +7,14 @@ import (
 	"github.com/square/go-jose/v3/jwt"
 )
 
-func VerifyJWT(raw string, sharedKey string, audience []string) bool {
+func VerifyJWT(raw string, sharedKey []byte, audience []string) bool {
 	token, err := jwt.ParseSigned(raw)
 	if err != nil {
 		return false
 	}
 
 	cl := jwt.Claims{}
-	if err := token.Claims([]byte(sharedKey), &cl); err != nil {
+	if err := token.Claims(sharedKey, &cl); err != nil {
 		return false
 	}
 
@@ -30,7 +30,7 @@ func VerifyJWT(raw string, sharedKey string, audience []string) bool {
 	return true
 }
 
-func GenerateJWT(sharedKey string, audience ...string) (string, error) {
+func GenerateJWT(sharedKey []byte, audience ...string) (string, error) {
 	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.HS512, Key: sharedKey},
 		(&jose.SignerOptions{}).WithType("JWT"))
 	if err != nil {

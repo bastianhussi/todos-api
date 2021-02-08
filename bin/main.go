@@ -3,17 +3,15 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/bastianhussi/todos-api/register"
-	"github.com/go-pg/pg/v10"
 	"github.com/gorilla/mux"
 
-	"github.com/bastianhussi/todos-api"
+	api "github.com/bastianhussi/todos-api"
 	"github.com/bastianhussi/todos-api/login"
 	"github.com/bastianhussi/todos-api/profile"
 )
@@ -22,9 +20,8 @@ var (
 	ctx    = context.Background()
 	config *api.Config
 	router *mux.Router
+	res    *api.Resources
 	srv    *http.Server
-	logger *log.Logger
-	db     *pg.DB
 )
 
 func init() {
@@ -35,22 +32,16 @@ func init() {
 	config, err = api.NewConfig()
 	api.Must(err)
 
-	db, err = api.NewDB(ctx, config)
+	res, err = api.NewResources(ctx, config)
 	api.Must(err)
-	conn := db.Conn()
-	defer conn.Close()
-
-	logger = log.New(os.Stdout, "api: ", log.LstdFlags|log.Lshortfile)
-
-	api.Must(api.CreateSchema(conn))
 
 	router = mux.NewRouter().StrictSlash(true)
 
 	// TODO: add profile route and use the auth adapter
-	addHandle(router, []string{"/login"}, login.NewHandler(config.SharedKey), http.MethodPost)
+	addHandle(router, []string{"/login"}, login.NewHandler(res.SharedKey), http.MethodPost)
 	addHandle(router, []string{"/register"}, register.NewHandler(), http.MethodPost)
 	addHandle(router, []string{"/profile/{id}", "/p/{id}"}, api.Adapt(profile.NewHandler(),
-		api.Auth()), http.MethodGet,
+		api.Auth(res.SharedKey)), http.MethodGet,
 		http.MethodPatch, http.MethodDelete)
 
 	srv = &http.Server{
@@ -58,7 +49,7 @@ func init() {
 		WriteTimeout: config.Timeout.Write,
 		ReadTimeout:  config.Timeout.Read,
 		IdleTimeout:  config.Timeout.Idle,
-		Handler:      api.Adapt(router, api.Recover(logger), api.Logging(logger)),
+		Handler:      api.Adapt(router, api.Recover(res.Logger), api.Logging(res.Logger)),
 	}
 }
 
@@ -66,20 +57,20 @@ func init() {
 //around them.
 func addHandle(r *mux.Router, paths []string, h http.Handler, methods ...string) {
 	for _, p := range paths {
-		r.Handle(p, api.WithLogger(logger, api.WithDB(db, h))).Methods(methods...)
+		r.Handle(p, api.WithLogger(res.Logger, api.WithDB(res.DB, h))).Methods(methods...)
 	}
 }
 
 func main() {
-	defer db.Close()
-	logger.Printf("Server is running on %s 🚀\n", srv.Addr)
+	defer res.Close()
+	res.Logger.Printf("Server is running on %s 🚀\n", srv.Addr)
 
 	// start the http server in a separate goroutine.
 	go func() {
 		if err := srv.ListenAndServe(); err == http.ErrServerClosed {
-			logger.Println("Server stopped 🛑")
+			res.Logger.Println("Server stopped 🛑")
 		} else {
-			logger.Fatal(err)
+			res.Logger.Fatal(err)
 		}
 	}()
 
@@ -96,6 +87,6 @@ func main() {
 	// try to shut the server down graceful by stop accepting incoming requests and finishing the
 	//remaining ones. After the timeout finished kill the server.
 	if err := srv.Shutdown(ctx); err != nil {
-		logger.Fatal(err)
+		res.Logger.Fatal(err)
 	}
 }

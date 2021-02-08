@@ -10,7 +10,7 @@ import (
 // Nice blog post about pg: https://medium.com/tunaiku-tech/go-pg-golang-postgre-orm-2618b75c0430
 
 // NewDB establishes a connection to the database and returns the database handle.
-func NewDB(ctx context.Context, c *Config) (*pg.DB, error) {
+func newDB(ctx context.Context, c *Config) (*pg.DB, error) {
 	db := pg.Connect(c.Postgres)
 
 	if err := db.Ping(ctx); err != nil {
@@ -22,7 +22,7 @@ func NewDB(ctx context.Context, c *Config) (*pg.DB, error) {
 
 // CreateSchema creates the corresponding database tables to the defined structs
 // like User, Todo, eg.
-func CreateSchema(db *pg.Conn) error {
+func createSchema(db *pg.Conn) error {
 	models := []interface{}{
 		(*Profile)(nil),
 		(*Todo)(nil),

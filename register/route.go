@@ -3,7 +3,7 @@ package register
 import (
 	"net/http"
 
-	"github.com/bastianhussi/todos-api"
+	api "github.com/bastianhussi/todos-api"
 )
 
 type Handler struct{}

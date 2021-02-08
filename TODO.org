@@ -1,8 +1,10 @@
 * TODO: Refactoring
   - [-] Add CRUD operations for profiles as methods to the profile struct. (Insert, update,
     delete, ...)
-  - [ ] Add support for new way of sharing resources using wrappers and context
-  - [ ] Remove unnecessary goroutines
+  - [x] Add support for new way of sharing resources using wrappers and context
+  - [x] Remove unnecessary goroutines
+  - [ ] Only use context for resources that are request local or even those outliving request 
+        (like secrets, db connections)?
   - [ ] Make every goroutine check the context for cancellation
   - [-] Create a auth middleware (might require further refactoring)
   - [ ] Write way more unit tests (jwt, database, e.g. totally uncovered at the moment)
@@ -15,3 +17,4 @@
   - [ ] Add 2-factor auth like OTP
   - [ ] Add opentelemetry support (works with go-pg as well)
   - [ ] Setup use for k8s
+  - [ ] Add cobra for command line args

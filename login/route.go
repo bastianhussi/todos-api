@@ -3,43 +3,48 @@ package login
 import (
 	"net/http"
 
-	"github.com/bastianhussi/todos-api"
+	api "github.com/bastianhussi/todos-api"
+	"golang.org/x/crypto/bcrypt"
 )
 
+// FIXME: add the sharedkey to the context for routes like this
 type Handler struct {
-	sharedKey string
+	sharedKey []byte
 }
 
-func NewHandler(k string) *Handler {
+// NewHandler creates a hanlder for the login route
+func NewHandler(k []byte) *Handler {
 	return &Handler{k}
 }
 
+// ServeHTTP handles the incoming requests for this route. In the case of the /login route,
+// there are only post request, trying to log the client and receive a jwt token to authenticate 
+// themselfes with.
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	profile := new(api.Profile)
-	if err := api.Decode(r, profile); err != nil {
+	loginProfile := new(api.LoginProfile)
+	if err := api.Decode(r, loginProfile); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	db := api.DBFromContext(ctx)
-	dbProfile, err := api.GetProfileByEmail(ctx, db, profile.Email)
+	profile, err := loginProfile.Select(ctx, db)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	// TODO: execute both in parallel
-
-	token, err := api.GenerateJWT(h.sharedKey, profile.Email)
-
+	token, err := api.GenerateJWT(h.sharedKey, loginProfile.Email)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if ok := decryptPass(ctx, dbProfile.Password, profile.Password); !ok {
+	if bcrypt.CompareHashAndPassword([]byte(profile.Password), []byte(loginProfile.Password)) != nil {
 		http.Error(w, "Wrong password! Please try again", http.StatusBadRequest)
+		return
 	}
 
 	api.Respond(w, http.StatusCreated, token)
