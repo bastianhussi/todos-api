@@ -1,4 +1,4 @@
-package register
+package profile
 
 import (
 	"net/http"
@@ -6,13 +6,13 @@ import (
 	api "github.com/bastianhussi/todos-api"
 )
 
-type Handler struct{}
+type RegisterHandler struct{}
 
-func NewHandler() *Handler {
-	return &Handler{}
+func NewRegisterHandler() *RegisterHandler {
+	return &RegisterHandler{}
 }
 
-func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *RegisterHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	db := api.DBFromContext(ctx)
 

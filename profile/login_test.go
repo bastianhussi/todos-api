@@ -1,4 +1,4 @@
-package login_test
+package profile_test
 
 import (
 	"net/http"

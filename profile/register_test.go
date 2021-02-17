@@ -1,4 +1,4 @@
-package register_test
+package profile_test
 
 import (
 	"net/http"
@@ -79,4 +79,3 @@ func must(err error) {
 		panic(err)
 	}
 }
-

@@ -1,4 +1,4 @@
-package login
+package profile
 
 import (
 	"net/http"
@@ -7,20 +7,34 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+type (
+	LoginHandler struct {
+		sharedKey []byte
+	}
+
+	LoginProfile struct {
+		profile *api.Profile
+		token   string
+	}
+)
+
 // FIXME: add the sharedkey to the context for routes like this
-type Handler struct {
-	sharedKey []byte
+// NewHandler creates a hanlder for the login route
+func NewLoginHandler(k []byte) *LoginHandler {
+	return &LoginHandler{k}
 }
 
-// NewHandler creates a hanlder for the login route
-func NewHandler(k []byte) *Handler {
-	return &Handler{k}
+func (p *LoginProfile) Public() interface{} {
+	return map[string]interface{}{
+		"profile": p.profile.Public(),
+		"token":   p.token,
+	}
 }
 
 // ServeHTTP handles the incoming requests for this route. In the case of the /login route,
-// there are only post request, trying to log the client and receive a jwt token to authenticate 
+// there are only post request, trying to log the client and receive a jwt token to authenticate
 // themselfes with.
-func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *LoginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	loginProfile := new(api.LoginProfile)
 	if err := api.Decode(r, loginProfile); err != nil {
@@ -47,5 +61,5 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	api.Respond(w, http.StatusCreated, token)
+	api.Respond(w, http.StatusCreated, &LoginProfile{profile, token})
 }

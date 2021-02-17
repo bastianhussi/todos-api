@@ -8,11 +8,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/bastianhussi/todos-api/register"
 	"github.com/gorilla/mux"
 
 	api "github.com/bastianhussi/todos-api"
-	"github.com/bastianhussi/todos-api/login"
 	"github.com/bastianhussi/todos-api/profile"
 )
 
@@ -29,8 +27,7 @@ func init() {
 
 	// if err would not been declared before config would only be shadow in this functions scope,
 	// but then be nil in the main-functions scope
-	config, err = api.NewConfig()
-	api.Must(err)
+	config = api.NewConfig()
 
 	res, err = api.NewResources(ctx, config)
 	api.Must(err)
@@ -38,9 +35,9 @@ func init() {
 	router = mux.NewRouter().StrictSlash(true)
 
 	// TODO: add profile route and use the auth adapter
-	addHandle(router, []string{"/login"}, login.NewHandler(res.SharedKey), http.MethodPost)
-	addHandle(router, []string{"/register"}, register.NewHandler(), http.MethodPost)
-	addHandle(router, []string{"/profile/{id}", "/p/{id}"}, api.Adapt(profile.NewHandler(),
+	addHandle(router, []string{"/login"}, profile.NewLoginHandler(res.SharedKey), http.MethodPost)
+	addHandle(router, []string{"/register"}, profile.NewRegisterHandler(), http.MethodPost)
+	addHandle(router, []string{"/profile/{id}", "/p/{id}"}, api.Adapt(profile.NewProfileHandler(),
 		api.Auth(res.SharedKey)), http.MethodGet,
 		http.MethodPatch, http.MethodDelete)
 

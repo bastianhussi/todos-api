@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"log"
 	"net/http"
 	"strings"
@@ -126,32 +125,4 @@ func Adapt(h http.Handler, adapters ...Adapter) http.Handler {
 	}
 
 	return h
-}
-
-func Respond(w http.ResponseWriter, status int, data interface{}) {
-	// If the data implements the Public interface use it to prevent exposing sensitive data.
-	if obj, ok := data.(Public); ok {
-		data = obj
-	}
-
-	body, err := json.Marshal(data)
-	Must(err)
-
-	w.Header().Add("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-	_, _ = w.Write(body)
-}
-
-func Decode(r *http.Request, v interface{ OK() error }) error {
-	// This can check if the OK method on a struct returns an error.
-	// We can check if required fields are given this way.
-	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
-		return err
-	}
-
-	if err := v.OK(); err != nil {
-		return err
-	}
-
-	return nil
 }

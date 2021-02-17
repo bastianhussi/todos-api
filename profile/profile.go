@@ -8,14 +8,14 @@ import (
 	"github.com/gorilla/mux"
 )
 
-type Handler struct{}
+type ProfileHandler struct{}
 
-func NewHandler() *Handler {
-	return &Handler{}
+func NewProfileHandler() *ProfileHandler {
+	return &ProfileHandler{}
 }
 
 // FIXME: refactor this, so that these methods still implement http.Handler by removing the channel arugment.
-func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
+func (h *ProfileHandler) Get(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	db := api.DBFromContext(ctx)
 
@@ -35,7 +35,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	api.Respond(w, http.StatusOK, profile)
 }
 
-func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
+func (h *ProfileHandler) Patch(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	conn := api.DBFromContext(ctx)
 
@@ -64,7 +64,7 @@ func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 	api.Respond(w, http.StatusOK, dbProfile)
 }
 
-func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
+func (h *ProfileHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	conn := api.DBFromContext(ctx)
 
@@ -90,7 +90,7 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	api.Respond(w, http.StatusOK, profile)
 }
 
-func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *ProfileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		h.Get(w, r)

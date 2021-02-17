@@ -25,28 +25,21 @@ type Config struct {
 // NewConfig creates a new config instance by reading the config.yml file
 // at the root of the project. Values inside of this config file will be overwritten
 // by environment variables.
-func NewConfig() (*Config, error) {
+func NewConfig() *Config {
 	c := new(Config)
 
 	// Use environment variables as well
 
-	// FIXME: Turn off in production
-	viper.WatchConfig()
 	viper.AutomaticEnv()
-
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
+	// FIXME: required for now. Change lauch.json or restructure project
+	viper.AddConfigPath("..")
 
 	// Read the file
-	if err := viper.ReadInConfig(); err != nil {
-		return nil, err
-	}
+	Must(viper.ReadInConfig())
+	Must(viper.Unmarshal(c))
 
-	// Tries to deserialize the yaml-file
-	if err := viper.Unmarshal(c); err != nil {
-		return nil, err
-	}
-
-	return c, nil
+	return c
 }
